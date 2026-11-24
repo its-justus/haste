@@ -60,6 +60,10 @@ haste's entity representatin is not debugger / print friendly, you would want to
 use [haste-inspector](https://github.com/blukai/haste-inspector) (replay dev
 tools) to explore all the entities that are present in replays.
 
+## development
+
+If you want to help develop haste, make sure you install `protobuf-devel` alongside protoc to ensure rust-analyzer has `google/protobuf/descriptor.proto`.
+
 ## feature flags
 
 - `broadcast`: enables http broadcasts.
