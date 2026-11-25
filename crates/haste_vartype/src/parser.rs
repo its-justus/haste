@@ -3,7 +3,7 @@ use crate::{Error, Token, TokenKind, Tokenizer};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Lit<'a> {
     Str(&'a str),
-    Num(usize),
+    Num(i64),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -11,9 +11,10 @@ pub enum Expr<'a> {
     Ident(&'a str),
     Lit(Lit<'a>),
     Pointer(Box<Expr<'a>>),
+    // Foo< A, B, -1 >: one or more arguments, each a type or a number literal.
     Template {
         expr: Box<Expr<'a>>,
-        arg: Box<Expr<'a>>,
+        args: Box<[Expr<'a>]>,
     },
     Array {
         expr: Box<Expr<'a>>,
@@ -106,30 +107,57 @@ impl<'a> Parser<'a> {
         Ok(Expr::Path(segments.into_boxed_slice()))
     }
 
+    // a number literal token, as an Expr. "-1" -> Lit(Num(-1)).
+    fn parse_lit(token: &Token<'a>) -> Result<Expr<'a>, Error> {
+        let TokenKind::Lit(lit) = token.kind else {
+            unreachable!();
+        };
+        let num = lit
+            .parse::<i64>()
+            .map_err(|_| Error::UnexpectedToken(token.span.start))?;
+        Ok(Expr::Lit(Lit::Num(num)))
+    }
+
+    // one template argument: a number literal, or a whole type (which may itself be a
+    // template, array, ...).
+    fn parse_template_arg(&mut self) -> Result<Expr<'a>, Error> {
+        match self.next_token()? {
+            Some(token) if matches!(token.kind, TokenKind::Lit(_)) => Self::parse_lit(&token),
+            Some(token) => {
+                self.prev_token = Some(token);
+                self.parse()
+            }
+            None => Err(Error::UnexpectedEof),
+        }
+    }
+
     fn parse(&mut self) -> Result<Expr<'a>, Error> {
         let mut expr = self.parse_path()?;
 
         while let Some(next) = self.next_token()? {
             match next.kind {
                 TokenKind::LAngle => {
-                    let arg = self.parse()?;
-
-                    let _rangle = self.expect_token(|k| matches!(k, TokenKind::RAngle))?;
+                    // arguments separated by commas, up to the closing '>'.
+                    let mut args = Vec::new();
+                    loop {
+                        args.push(self.parse_template_arg()?);
+                        let token = self.expect_token(|k| {
+                            matches!(k, TokenKind::Comma | TokenKind::RAngle)
+                        })?;
+                        if token.kind == TokenKind::RAngle {
+                            break;
+                        }
+                    }
                     expr = Expr::Template {
                         expr: Box::new(expr),
-                        arg: Box::new(arg),
+                        args: args.into_boxed_slice(),
                     };
                 }
                 TokenKind::LSquare => {
                     let token = self.expect_token(|_| true)?;
                     let len = match token.kind {
                         TokenKind::Ident(ident) => Expr::Ident(ident),
-                        TokenKind::Lit(lit) => {
-                            let num = lit
-                                .parse::<usize>()
-                                .map_err(|_| Error::UnexpectedToken(token.span.start))?;
-                            Expr::Lit(Lit::Num(num))
-                        }
+                        TokenKind::Lit(_) => Self::parse_lit(&token)?,
                         _ => return Err(Error::UnexpectedToken(token.span.start)),
                     };
 
@@ -142,7 +170,8 @@ impl<'a> Parser<'a> {
                 TokenKind::Asterisk => {
                     expr = Expr::Pointer(Box::new(expr));
                 }
-                TokenKind::RAngle | TokenKind::RSquare => {
+                // these end this expression; the caller (a template or array) takes them.
+                TokenKind::RAngle | TokenKind::RSquare | TokenKind::Comma => {
                     self.prev_token = Some(next);
                     break;
                 }
@@ -155,7 +184,13 @@ impl<'a> Parser<'a> {
 }
 
 pub fn parse(input: &str) -> Result<Expr<'_>, Error> {
-    Parser::new(input).parse()
+    let mut parser = Parser::new(input);
+    let expr = parser.parse()?;
+    // the whole input must be used: "Foo >" or "Foo, Bar" is an error, not Foo.
+    match parser.next_token()? {
+        Some(token) => Err(Error::UnexpectedToken(token.span.start)),
+        None => Ok(expr),
+    }
 }
 
 #[cfg(test)]
@@ -189,6 +224,26 @@ mod tests {
     }
 
     #[test]
+    fn malformed_templates() {
+        // each must fail; the number is where.
+        let cases = [
+            ("A<>", 2),    // no argument
+            ("A<B,>", 4),  // nothing after the comma
+            ("A<B C>", 4), // missing comma
+            ("A<B", 0),    // never closed (eof)
+            ("A>", 1),     // stray '>'
+            ("A, B", 1),   // stray ','
+        ];
+        for (input, at) in cases {
+            match parse(input) {
+                Err(Error::UnexpectedToken(pos)) => assert_eq!(pos, at, "{input}"),
+                Err(Error::UnexpectedEof) => assert_eq!(at, 0, "{input}"),
+                other => panic!("{input}: expected an error, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
     fn it_works() -> Result<(), Error> {
         const INPUTS: &[&'static str] = &[
             "uint64[256]",
@@ -197,6 +252,7 @@ mod tests {
             "CHandle< CDOTASpecGraphPlayerData >[24]",
             "CDOTA_AbilityDraftAbilityState[MAX_ABILITY_DRAFT_ABILITIES]",
             "CCitadel_Ability_Baba_BubblingBrew::EState",
+            "CNetworkUtlVectorBase< CNetworkUtlVectorBase< EEvent, NetworkVar_m_vecActiveEvents , -1, int > >",
         ];
 
         let mut outputs: Vec<Result<Expr<'static>, Error>> = Vec::with_capacity(INPUTS.len());
@@ -229,14 +285,18 @@ mod tests {
                         expr: Ident(
                             "CNetworkUtlVectorBase",
                         ),
-                        arg: Template {
-                            expr: Ident(
-                                "CHandle",
-                            ),
-                            arg: Ident(
-                                "CBasePlayerController",
-                            ),
-                        },
+                        args: [
+                            Template {
+                                expr: Ident(
+                                    "CHandle",
+                                ),
+                                args: [
+                                    Ident(
+                                        "CBasePlayerController",
+                                    ),
+                                ],
+                            },
+                        ],
                     },
                 ),
                 Ok(
@@ -245,9 +305,11 @@ mod tests {
                             expr: Ident(
                                 "CHandle",
                             ),
-                            arg: Ident(
-                                "CDOTASpecGraphPlayerData",
-                            ),
+                            args: [
+                                Ident(
+                                    "CDOTASpecGraphPlayerData",
+                                ),
+                            ],
                         },
                         len: Lit(
                             Num(
@@ -277,6 +339,36 @@ mod tests {
                             ),
                         ],
                     ),
+                ),
+                Ok(
+                    Template {
+                        expr: Ident(
+                            "CNetworkUtlVectorBase",
+                        ),
+                        args: [
+                            Template {
+                                expr: Ident(
+                                    "CNetworkUtlVectorBase",
+                                ),
+                                args: [
+                                    Ident(
+                                        "EEvent",
+                                    ),
+                                    Ident(
+                                        "NetworkVar_m_vecActiveEvents",
+                                    ),
+                                    Lit(
+                                        Num(
+                                            -1,
+                                        ),
+                                    ),
+                                    Ident(
+                                        "int",
+                                    ),
+                                ],
+                            },
+                        ],
+                    },
                 ),
             ]
         "#]];

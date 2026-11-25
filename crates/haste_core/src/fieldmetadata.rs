@@ -10,6 +10,12 @@ pub enum FieldMetadataError {
     FieldDecoderConstructionError(#[from] FieldDecoderConstructionError),
     #[error("unknown array length ident: {0}")]
     UnknownArrayLengthIdent(String),
+    #[error("invalid array length: {0}")]
+    InvalidArrayLength(i64),
+    /// a part of the type the parser accepts but nothing here knows how to decode, such as a
+    /// number where a type is expected (`CUtlVector< 5 >`).
+    #[error("unsupported type expression: {0}")]
+    UnsupportedExpr(String),
 }
 
 // NOTE: Clone is derived because FlattenedSerializerField needs to be clonable.
@@ -181,11 +187,13 @@ fn visit_ident(
 #[inline]
 fn visit_template(
     expr: Expr,
-    arg: Expr,
+    args: Box<[Expr]>,
     field: &FlattenedSerializerField,
 ) -> Result<FieldMetadata, FieldMetadataError> {
     let Expr::Ident(ident) = expr else {
-        unreachable!();
+        return Err(FieldMetadataError::UnsupportedExpr(format!(
+            "template on {expr:?}, not a plain name"
+        )));
     };
 
     if matches!(
@@ -199,7 +207,13 @@ fn visit_template(
             });
         }
 
-        return visit_any(arg, field).map(|field_metadata| FieldMetadata {
+        // the first argument is the item type. vectors may carry more arguments, such as
+        // `CNetworkUtlVectorBase< EEvent, NetworkVar_m_vecActiveEvents , -1, int >`; the rest
+        // (a name, a number, another type) do not change how the items are decoded.
+        let item = args.into_vec().into_iter().next().ok_or_else(|| {
+            FieldMetadataError::UnsupportedExpr(format!("{ident} without arguments"))
+        })?;
+        return visit_any(item, field).map(|field_metadata| FieldMetadata {
             special_descriptor: Some(FieldSpecialDescriptor::DynamicArray {
                 decoder: field_metadata.decoder,
             }),
@@ -236,8 +250,12 @@ fn visit_array(
                 ident.to_owned(),
             )),
         },
-        Expr::Lit(Lit::Num(length)) => Ok(length),
-        _ => unreachable!(),
+        Expr::Lit(Lit::Num(length)) => {
+            usize::try_from(length).map_err(|_| FieldMetadataError::InvalidArrayLength(length))
+        }
+        other => Err(FieldMetadataError::UnsupportedExpr(format!(
+            "array length {other:?}"
+        ))),
     }?;
 
     visit_any(expr, field).map(|field_metadata| FieldMetadata {
@@ -274,8 +292,10 @@ fn visit_any(
 ) -> Result<FieldMetadata, FieldMetadataError> {
     match expr {
         Expr::Ident(ident) => visit_ident(ident, field),
-        Expr::Lit(_) => unreachable!(),
-        Expr::Template { expr, arg } => visit_template(*expr, *arg, field),
+        Expr::Lit(lit) => Err(FieldMetadataError::UnsupportedExpr(format!(
+            "{lit:?} where a type is expected"
+        ))),
+        Expr::Template { expr, args } => visit_template(*expr, args, field),
         Expr::Array { expr, len } => visit_array(*expr, *len, field),
         Expr::Pointer(_) => visit_pointer(),
         Expr::Path(segments) => visit_path(&segments, field),

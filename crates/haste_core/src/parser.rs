@@ -2,7 +2,7 @@ use std::io::{self, SeekFrom};
 
 use anyhow::Result;
 use valveprotos::common::{
-    CDemoFullPacket, CDemoPacket, CDemoStringTables, CsvcMsgCreateStringTable,
+    CDemoFileHeader, CDemoFullPacket, CDemoPacket, CDemoStringTables, CsvcMsgCreateStringTable,
     CsvcMsgPacketEntities, CsvcMsgServerInfo, CsvcMsgUpdateStringTable, EDemoCommands, SvcMessages,
 };
 use valveprotos::prost::Message;
@@ -46,6 +46,7 @@ pub struct Context {
     full_packet_interval: i32,
     tick: i32,
     prev_tick: i32,
+    build_num: Option<i32>,
 }
 
 impl Context {
@@ -58,6 +59,12 @@ impl Context {
         } else {
             Some(&self.string_tables)
         }
+    }
+
+    /// the game build the replay was recorded on, from its file header.
+    #[inline]
+    pub fn build_num(&self) -> Option<i32> {
+        self.build_num
     }
 
     #[inline]
@@ -159,6 +166,7 @@ impl<D: DemoStream, V: Visitor> Parser<D, V> {
                 full_packet_interval: 0,
                 tick: -1,
                 prev_tick: -1,
+                build_num: None,
             },
             field_decode_ctx: FieldDecoderContext::default(),
         })
@@ -310,6 +318,11 @@ impl<D: DemoStream, V: Visitor> Parser<D, V> {
                 self.handle_cmd_packet(cmd)?;
             }
 
+            // the first command; only the build number is kept.
+            EDemoCommands::DemFileHeader => {
+                self.ctx.build_num = CDemoFileHeader::decode(cmd_body)?.build_num;
+            }
+
             EDemoCommands::DemSendTables => {
                 // NOTE: this check exists because seeking exists, there's no
                 // need to re-parse flattened serializers
@@ -318,7 +331,11 @@ impl<D: DemoStream, V: Visitor> Parser<D, V> {
                 }
 
                 let cmd = D::decode_cmd_send_tables(cmd_body)?;
-                self.ctx.serializers = Some(FlattenedSerializerContainer::parse(cmd)?);
+                let build_num = self.ctx.build_num;
+                self.ctx.serializers = Some(
+                    FlattenedSerializerContainer::parse(cmd)
+                        .map_err(|err| err.with_build(build_num))?,
+                );
             }
 
             EDemoCommands::DemClassInfo => {

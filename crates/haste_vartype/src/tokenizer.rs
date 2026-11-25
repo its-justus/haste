@@ -8,8 +8,9 @@ pub enum TokenKind<'a> {
     RSquare,        // ]
     Asterisk,       // *
     Ident(&'a str), // uint64, MAX_ABILITY_DRAFT_ABILITIES, etc..
-    Lit(&'a str),   // 256
+    Lit(&'a str),   // 256, -1
     ColonColon,     // ::
+    Comma,          // ,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -132,12 +133,20 @@ impl<'a> Tokenizer<'a> {
                 '[' => break Some(Ok(self.emit(TokenKind::LSquare))),
                 ']' => break Some(Ok(self.emit(TokenKind::RSquare))),
                 '*' => break Some(Ok(self.emit(TokenKind::Asterisk))),
+                ',' => break Some(Ok(self.emit(TokenKind::Comma))),
                 ':' if self.peek_char() == Some(':') => {
+                    // the span covers both colons; emit() would cover only the second.
+                    let start = self.prev_offset();
                     _ = self.next_char();
-                    break Some(Ok(self.emit(TokenKind::ColonColon)));
+                    let span = Span::new(start as u16, self.offset as u16);
+                    break Some(Ok(Token::new(TokenKind::ColonColon, span)));
                 }
                 ch if is_ident_start(ch) => break Some(Ok(self.emit_ident())),
                 ch if ch.is_ascii_digit() => break Some(Ok(self.emit_lit())),
+                // a negative number; a '-' on its own is not a token.
+                '-' if self.peek_char().is_some_and(|ch| ch.is_ascii_digit()) => {
+                    break Some(Ok(self.emit_lit()))
+                }
                 ch if ch.is_whitespace() => {
                     self.eat_whitespace();
                 }
@@ -354,7 +363,7 @@ CCitadel_Ability_Baba_BubblingBrew::EState
                 Ok(
                     Token {
                         kind: ColonColon,
-                        span: Span { 224, 225 },
+                        span: Span { 223, 225 },
                     },
                 ),
                 Ok(
@@ -368,5 +377,35 @@ CCitadel_Ability_Baba_BubblingBrew::EState
             ]
         "#]];
         expected.assert_debug_eq(&tokens);
+    }
+
+    #[test]
+    fn template_arguments() {
+        use TokenKind::*;
+
+        let kinds: Vec<TokenKind> = Tokenizer::new("A< B, Name , -1, int >")
+            .map(|token| token.unwrap().kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                Ident("A"),
+                LAngle,
+                Ident("B"),
+                Comma,
+                Ident("Name"),
+                Comma,
+                Lit("-1"),
+                Comma,
+                Ident("int"),
+                RAngle,
+            ]
+        );
+    }
+
+    #[test]
+    fn lone_minus_is_an_error() {
+        let result: Result<Vec<Token>, Error> = Tokenizer::new("A - 1").collect();
+        assert!(matches!(result, Err(Error::UnknownChar('-'))));
     }
 }

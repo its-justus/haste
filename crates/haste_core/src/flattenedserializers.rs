@@ -1,5 +1,6 @@
 use std::array;
 use std::collections::hash_map;
+use std::fmt;
 use std::hash::BuildHasherDefault;
 use std::rc::Rc;
 
@@ -26,8 +27,65 @@ pub enum FlattenedSerializersError {
     DecodeError(#[from] prost::DecodeError),
     #[error(transparent)]
     ReadVarintError(#[from] varint::ReadVarintError),
-    #[error(transparent)]
-    FieldMetadataError(#[from] FieldMetadataError),
+    /// every field whose type haste can't read, all collected in one pass.
+    #[error("{}", UnsupportedFieldTypesDisplay { build: *build, fields })]
+    UnsupportedFieldTypes {
+        /// the replay's build number (from the file header), if known.
+        build: Option<i32>,
+        fields: Vec<UnsupportedFieldType>,
+    },
+}
+
+impl FlattenedSerializersError {
+    /// sets the build number on [`Self::UnsupportedFieldTypes`]; other errors are unchanged.
+    pub(crate) fn with_build(mut self, build_num: Option<i32>) -> Self {
+        if let Self::UnsupportedFieldTypes { build, .. } = &mut self {
+            *build = build_num;
+        }
+        self
+    }
+}
+
+/// a field whose type string haste can't read or has no decoder for.
+#[derive(Debug, Clone)]
+pub struct UnsupportedFieldType {
+    /// the serializer (entity class) that first used the field, e.g. `CCitadelEventState`.
+    pub class: String,
+    /// e.g. `m_vecActiveEvents`.
+    pub field: String,
+    /// the full type string, e.g. `CNetworkUtlVectorBase< ... >`.
+    pub var_type: String,
+    /// why it failed.
+    pub reason: String,
+}
+
+impl fmt::Display for UnsupportedFieldType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}.{}: type `{}`: {}",
+            self.class, self.field, self.var_type, self.reason
+        )
+    }
+}
+
+struct UnsupportedFieldTypesDisplay<'a> {
+    build: Option<i32>,
+    fields: &'a [UnsupportedFieldType],
+}
+
+impl fmt::Display for UnsupportedFieldTypesDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} field type(s) could not be read", self.fields.len())?;
+        match self.build {
+            Some(build) => write!(f, " (build {build})")?,
+            None => write!(f, " (build unknown)")?,
+        }
+        for field in self.fields {
+            write!(f, "\n  {field}")?;
+        }
+        Ok(())
+    }
 }
 
 // TODO: symbol table / string cache (but do not use servo's string cache
@@ -289,6 +347,9 @@ impl FlattenedSerializerContainer {
                 BuildHasherDefault::default(),
             );
 
+        let mut unsupported: Vec<UnsupportedFieldType> = Vec::new();
+        let mut failed_fields: std::collections::HashSet<i32> = Default::default();
+
         for serializer in msg.serializers.iter() {
             let mut flattened_serializer = FlattenedSerializer::new(&msg, serializer);
 
@@ -298,8 +359,27 @@ impl FlattenedSerializerContainer {
                     continue;
                 }
 
-                let mut field =
-                    FlattenedSerializerField::new(&msg, &msg.fields[*field_index as usize])?;
+                let proto_field = &msg.fields[*field_index as usize];
+                let mut field = match FlattenedSerializerField::new(&msg, proto_field) {
+                    Ok(field) => field,
+                    Err(err) => {
+                        // keep going, so every unsupported type is reported at once. a field
+                        // shared by several serializers is reported once, with the first.
+                        if failed_fields.insert(*field_index) {
+                            let sym = |i: Option<i32>| {
+                                i.and_then(|i| msg.symbols.get(i as usize))
+                                    .map_or_else(|| "?".to_string(), |s| s.to_string())
+                            };
+                            unsupported.push(UnsupportedFieldType {
+                                class: sym(serializer.serializer_name_sym),
+                                field: sym(proto_field.var_name_sym),
+                                var_type: sym(proto_field.var_type_sym),
+                                reason: err.to_string(),
+                            });
+                        }
+                        continue;
+                    }
+                };
 
                 field.field_serializer = match field.metadata.special_descriptor {
                     Some(FieldSpecialDescriptor::FixedArray { length }) => {
@@ -360,6 +440,13 @@ impl FlattenedSerializerContainer {
             );
         }
 
+        if !unsupported.is_empty() {
+            return Err(FlattenedSerializersError::UnsupportedFieldTypes {
+                build: None,
+                fields: unsupported,
+            });
+        }
+
         Ok(Self { serializer_map })
     }
 
@@ -386,5 +473,57 @@ impl FlattenedSerializerContainer {
     #[inline]
     pub fn values(&self) -> hash_map::Values<'_, u64, Rc<FlattenedSerializer>> {
         self.serializer_map.values()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use valveprotos::common::{
+        CDemoSendTables, CsvcMsgFlattenedSerializer, ProtoFlattenedSerializerFieldT,
+        ProtoFlattenedSerializerT,
+    };
+    use valveprotos::prost::Message;
+
+    use super::*;
+
+    // a send table with one good field, one field no decoder handles, and one that does not
+    // parse; the last is shared by two serializers.
+    fn send_tables() -> CDemoSendTables {
+        let symbols = [
+            "CFoo", "CBar", "m_ok", "int32", "m_bad", "CUtlVector< 5 >", "m_shared", "A<>",
+        ];
+        let field = |name: i32, ty: i32| ProtoFlattenedSerializerFieldT {
+            var_name_sym: Some(name),
+            var_type_sym: Some(ty),
+            ..Default::default()
+        };
+        let serializer = |name: i32, fields: Vec<i32>| ProtoFlattenedSerializerT {
+            serializer_name_sym: Some(name),
+            serializer_version: Some(0),
+            fields_index: fields,
+        };
+        let msg = CsvcMsgFlattenedSerializer {
+            symbols: symbols.iter().map(|s| s.to_string()).collect(),
+            fields: vec![field(2, 3), field(4, 5), field(6, 7)],
+            serializers: vec![serializer(0, vec![0, 1, 2]), serializer(1, vec![2])],
+        };
+        CDemoSendTables {
+            data: Some(msg.encode_length_delimited_to_vec()),
+        }
+    }
+
+    #[test]
+    fn unsupported_field_types_are_all_reported() {
+        let Err(err) = FlattenedSerializerContainer::parse(send_tables()) else {
+            panic!("expected an error");
+        };
+        let err = err.with_build(Some(6866));
+        assert_eq!(
+            err.to_string(),
+            "2 field type(s) could not be read (build 6866)\n  \
+             CFoo.m_bad: type `CUtlVector< 5 >`: unsupported type expression: \
+             Num(5) where a type is expected\n  \
+             CFoo.m_shared: type `A<>`: unexpected token at 2"
+        );
     }
 }
