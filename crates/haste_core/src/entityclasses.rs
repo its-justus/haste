@@ -1,5 +1,5 @@
 use mars::fxhash;
-use valveprotos::common::CDemoClassInfo;
+use haste_protos::CDemoClassInfo;
 
 #[derive(Clone)]
 pub struct ClassInfo {

@@ -1,7 +1,7 @@
 use std::io::{self, SeekFrom};
 
 use mars::varint;
-use valveprotos::common::{
+use haste_protos::{
     CDemoClassInfo, CDemoFullPacket, CDemoPacket, CDemoSendTables, EDemoCommands,
 };
 

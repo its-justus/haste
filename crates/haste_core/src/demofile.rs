@@ -2,10 +2,10 @@ use std::io::{self, Read, Seek, SeekFrom};
 
 use mars::varint;
 use prost::Message;
-use valveprotos::common::{
+use haste_protos::{
     CDemoClassInfo, CDemoFileInfo, CDemoFullPacket, CDemoPacket, CDemoSendTables, EDemoCommands,
 };
-use valveprotos::prost;
+use haste_protos::prost;
 
 use crate::demostream::{CmdHeader, DecodeCmdError, DemoStream, ReadCmdError, ReadCmdHeaderError};
 

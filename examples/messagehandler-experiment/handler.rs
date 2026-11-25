@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use anyhow::Result;
 use haste::parser::{Context, Visitor};
-use haste::valveprotos::prost;
+use haste::protos::prost;
 
 pub trait MessageHandler<S, M: prost::Message + Default> {
     fn handle(&self, state: &mut S, ctx: &Context, message: &M) -> Result<()>;

@@ -9,8 +9,8 @@ use haste::demostream::CmdHeader;
 use haste::entities::{DeltaHeader, Entity, fkey_from_path};
 use haste::fxhash;
 use haste::parser::{Context, Parser, Visitor};
-use haste::valveprotos::common::{CnetMsgTick, EDemoCommands, NetMessages};
-use haste::valveprotos::prost::Message;
+use haste::protos::{CnetMsgTick, EDemoCommands, NetMessages};
+use haste::protos::prost::Message;
 
 const DEADLOCK_GAMERULES_ENTITY: u64 = fxhash::hash_bytes(b"CCitadelGameRulesProxy");
 

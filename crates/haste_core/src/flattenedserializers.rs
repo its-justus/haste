@@ -7,11 +7,11 @@ use std::rc::Rc;
 use mars::fxhash;
 use mars::nohash::NoHashMap;
 use mars::varint;
-use valveprotos::common::{
+use haste_protos::{
     CDemoSendTables, CsvcMsgFlattenedSerializer, ProtoFlattenedSerializerFieldT,
     ProtoFlattenedSerializerT,
 };
-use valveprotos::prost::{self, Message};
+use haste_protos::prost::{self, Message};
 
 use crate::fieldmetadata::{
     FieldMetadata, FieldMetadataError, FieldSpecialDescriptor, get_field_metadata,
@@ -124,7 +124,7 @@ impl<T: AsRef<str>> From<T> for Symbol {
 // or build a symbol table from symbols (string cache?)
 
 /// note about missing `field_serializer_version` field (from
-/// [`valveprotos::common::ProtoFlattenedSerializerFieldT`]): i did not find any evidence of it
+/// [`haste_protos::ProtoFlattenedSerializerFieldT`]): i did not find any evidence of it
 /// being used nor any breakage or data corruptions. it is possible that i missed something. but
 /// unless proven otherwise i don't see a reason for incorporating it. field serializers always
 /// reference "highest" version of serializer.
@@ -263,10 +263,10 @@ impl FlattenedSerializerField {
 }
 
 /// note about missing `serializer_version` field (from
-/// [`valveprotos::common::ProtoFlattenedSerializerT`]): entities resolve their serializers by
+/// [`haste_protos::ProtoFlattenedSerializerT`]): entities resolve their serializers by
 /// looking up their class info within the [crate::entityclasses::EntityClasses] struct (which i
-/// parse out of [`valveprotos::common::CDemoClassInfo`] proto).
-/// [`valveprotos::common::CDemoClassInfo`] carries absolutely no info about serializer version
+/// parse out of [`haste_protos::CDemoClassInfo`] proto).
+/// [`haste_protos::CDemoClassInfo`] carries absolutely no info about serializer version
 /// thus i don't see any need to preserve it.
 //
 // NOTE: Clone is derived because Entity in entities.rs needs to be clonable which means that all
@@ -478,11 +478,11 @@ impl FlattenedSerializerContainer {
 
 #[cfg(test)]
 mod tests {
-    use valveprotos::common::{
+    use haste_protos::{
         CDemoSendTables, CsvcMsgFlattenedSerializer, ProtoFlattenedSerializerFieldT,
         ProtoFlattenedSerializerT,
     };
-    use valveprotos::prost::Message;
+    use haste_protos::prost::Message;
 
     use super::*;
 
@@ -506,6 +506,7 @@ mod tests {
             symbols: symbols.iter().map(|s| s.to_string()).collect(),
             fields: vec![field(2, 3), field(4, 5), field(6, 7)],
             serializers: vec![serializer(0, vec![0, 1, 2]), serializer(1, vec![2])],
+            ..Default::default()
         };
         CDemoSendTables {
             data: Some(msg.encode_length_delimited_to_vec()),

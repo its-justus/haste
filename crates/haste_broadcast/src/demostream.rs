@@ -2,7 +2,7 @@ use std::io::{Read, SeekFrom};
 
 use haste_core::demostream::{CmdHeader, DecodeCmdError, DemoStream, ReadCmdHeaderError};
 use prost::Message;
-use valveprotos::common::{
+use haste_protos::{
     CDemoClassInfo, CDemoFullPacket, CDemoPacket, CDemoSendTables, EDemoCommands,
 };
 

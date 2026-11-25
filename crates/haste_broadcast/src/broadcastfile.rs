@@ -4,7 +4,7 @@ use haste_core::demofile::DEMO_RECORD_BUFFER_SIZE;
 use haste_core::demostream::{
     CmdHeader, DecodeCmdError, DemoStream, ReadCmdError, ReadCmdHeaderError,
 };
-use valveprotos::common::{CDemoClassInfo, CDemoFullPacket, CDemoPacket, CDemoSendTables};
+use haste_protos::{CDemoClassInfo, CDemoFullPacket, CDemoPacket, CDemoSendTables};
 
 use crate::demostream::{
     decode_cmd_class_info, decode_cmd_full_packet, decode_cmd_packet, decode_cmd_send_tables,

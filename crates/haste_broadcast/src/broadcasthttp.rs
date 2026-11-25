@@ -9,7 +9,7 @@ use haste_core::demostream::{
     CmdHeader, DecodeCmdError, DemoStream, ReadCmdError, ReadCmdHeaderError,
 };
 use serde::Deserialize;
-use valveprotos::common::{CDemoClassInfo, CDemoFullPacket, CDemoPacket, CDemoSendTables};
+use haste_protos::{CDemoClassInfo, CDemoFullPacket, CDemoPacket, CDemoSendTables};
 
 use crate::demostream::{
     decode_cmd_class_info, decode_cmd_full_packet, decode_cmd_packet, decode_cmd_send_tables,

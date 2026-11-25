@@ -23,7 +23,8 @@ pub mod typereport;
 pub(crate) use haste_vartype as vartype;
 // my other repo re-exports
 pub use mars::fxhash;
-pub use valveprotos;
+// own crate re-exports (public)
+pub use haste_protos as protos;
 
 // TOOD: more optimizations, specifically look into
 // https://agourlay.github.io/rust-performance-retrospective-part2/
@@ -56,7 +57,7 @@ pub use valveprotos;
 
 // TODO: figure out combat log
 
-// NOTE: preserve-metadata feature is enabled in haste_dota2_atoms_codegen
+// NOTE: preserve-metadata feature is enabled in an earlier codegen
 // crate, but it's disabled everywhere else. command `cargo build --release
 // --bin emptybench` produces a release build in which this feature is enabled,
 // this is wrong, see https://github.com/rust-lang/cargo/issues/4463 for more

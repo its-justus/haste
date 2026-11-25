@@ -16,7 +16,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["time", "sync"], optional = true }
-valveprotos.workspace = true
+haste_protos.workspace = true
 
 [features]
 default = ["reqwest", "tokio"]

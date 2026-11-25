@@ -8,10 +8,10 @@
 use std::collections::{BTreeMap, HashSet};
 
 use mars::varint;
-use valveprotos::common::{
+use haste_protos::{
     CDemoFileHeader, CDemoSendTables, CsvcMsgFlattenedSerializer, EDemoCommands,
 };
-use valveprotos::prost::{self, Message};
+use haste_protos::prost::{self, Message};
 
 pub use haste_vartype::known_deadlock_types;
 
@@ -139,7 +139,7 @@ pub(crate) fn report_from_serializers(
 
 #[cfg(test)]
 mod tests {
-    use valveprotos::common::{ProtoFlattenedSerializerFieldT, ProtoFlattenedSerializerT};
+    use haste_protos::{ProtoFlattenedSerializerFieldT, ProtoFlattenedSerializerT};
 
     use super::*;
 
@@ -161,6 +161,7 @@ mod tests {
             // m_a and m_c are int32; m_b is a vector of a number.
             fields: vec![field(2, 3), field(4, 5), field(6, 3)],
             serializers: vec![serializer(0, vec![0, 1]), serializer(1, vec![0, 2])],
+            ..Default::default()
         };
         let known = HashSet::from(["int32"]);
 

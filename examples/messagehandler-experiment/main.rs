@@ -8,7 +8,7 @@ use haste::demofile::DemoFile;
 use haste::entities::{self, Entity};
 use haste::parser::{Context, Parser};
 use haste::stringtables::StringTable;
-use haste::valveprotos::deadlock::{CCitadelUserMsgHeroKilled, CitadelUserMessageIds};
+use haste::protos::{CCitadelUserMsgHeroKilled, CitadelUserMessageIds};
 
 mod handler;
 

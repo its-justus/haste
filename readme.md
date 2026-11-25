@@ -1,6 +1,6 @@
 # haste
 
-world's fastest dota 2 and deadlock (the game) replay parser. more then two
+world's fastest deadlock (the game) replay parser; dota 2 is no longer supported. more then two
 times faster than comically fast.
 
 haste attempts to squeeze maximum single-core performance from the cpu, which
@@ -30,8 +30,6 @@ deadlock (the game);
 - [deadlock-gametime](examples/deadlock-gametime.rs) also demonstrates how to work
 with entities and how to compute game time (not a very straightforward thing to
 do, thanks valve).
-- [dota2-allchat](examples/dota2-allchat.rs) shows how to work with packet
-messages.
 
 to run these examples navigate to haste directory and run
 
@@ -41,11 +39,7 @@ $ cargo run --example <example-name> -- <path-to-dem-file>
 
 ### usage
 
-to use haste in your project, you'll need either:
- - `protoc` (protocol buffer compiler) in your `$PATH`, or `$PROTOC` environment
- variable needs point to it
- - or `cmake` (if you don't have `protoc`, it will be compiled for you) and
- `protobuf-src` feature flag enabled
+to use haste in your project you need a rust toolchain and nothing else.
 
 haste is not published to [crates.io](https://crates.io/) (yet?). you can add it
 to your `Cargo.toml` as a [git
@@ -63,11 +57,19 @@ tools) to explore all the entities that are present in replays.
 ## feature flags
 
 - `broadcast`: enables http broadcasts.
-- `deadlock`: enables deadlock protos and some utilities.
-- `dota2`: enabled dota2 protos and some utilities.
-- `protobuf-src`: enables
-[protobuf_src](https://docs.rs/protobuf-src/latest/protobuf_src/) crate which
-builds `protoc`.
+- `preserve-metadata`: keeps symbol strings (for tools that print field names).
+
+## protobuf definitions
+
+`crates/haste_protos` holds deadlock's .proto files, copied from
+[SteamDatabase/Protobufs](https://github.com/SteamDatabase/Protobufs) at the commit in
+`crates/haste_protos/PIN`; haste re-exports the crate as `haste::protos`. They are
+compiled by the pure rust `protox` at build time: no `protoc` is needed.
+
+`tools/protowatch` updates the copy (`protowatch fetch <checkout>`) and lists how the
+messages in `crates/haste_protos/WATCHED` differ from a newer checkout
+(`protowatch diff <checkout>`). A scheduled workflow runs it daily and opens an issue when
+something differs.
 
 ## benchmarks
 

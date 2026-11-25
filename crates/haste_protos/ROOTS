@@ -1,0 +1,13 @@
+# Proto files (relative to SteamDatabase/Protobufs' deadlock/ folder) the crate is built
+# from. `protowatch fetch` copies these and their import closure into protos/.
+# One name per line; `#` starts a comment.
+demo.proto
+netmessages.proto
+networkbasetypes.proto
+usermessages.proto
+gameevents.proto
+te.proto
+citadel_usermessages.proto
+citadel_gameevents.proto
+base_modifier.proto
+citadel_gcmessages_common.proto

@@ -1,11 +1,11 @@
 use std::io::{self, SeekFrom};
 
 use anyhow::Result;
-use valveprotos::common::{
+use haste_protos::{
     CDemoFileHeader, CDemoFullPacket, CDemoPacket, CDemoStringTables, CsvcMsgCreateStringTable,
     CsvcMsgPacketEntities, CsvcMsgServerInfo, CsvcMsgUpdateStringTable, EDemoCommands, SvcMessages,
 };
-use valveprotos::prost::Message;
+use haste_protos::prost::Message;
 
 use crate::bitreader::BitReader;
 use crate::demofile::{DEMO_RECORD_BUFFER_SIZE, DemoHeaderError};
@@ -21,11 +21,11 @@ use crate::stringtables::StringTableContainer;
 // (src/main/java/skadistats/clarity/model/engine/AbstractDotaEngineType.java)
 // and documented in manta (string_table.go).
 //
-// NOTE: full packet interval is 1800 only if tick interval is 1 / 30 - this is true for dota2, but
-// deaclock's tick interval is x 2.
+// NOTE: full packet interval is 1800 only if tick interval is 1 / 30; deadlock's is
+// 1 / 60 and the ratio below scales this.
 const DEFAULT_FULL_PACKET_INTERVAL: i32 = 1800;
 // NOTE: tick interval is needed to be able to correctly decide simulation time values.
-// dota2's tick interval is 1 / 30; deadlock's 1 / 60 - they are constant.
+// the default is the 1 / 30 of the games this parser started with; deadlock's is 1 / 60.
 const DEFAULT_TICK_INTERVAL: f32 = 1.0 / 30.0;
 
 // NOTE: primary purpose of Context is to to be able to expose state to the

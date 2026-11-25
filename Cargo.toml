@@ -13,9 +13,8 @@ edition = "2021"
 haste = { path = "." }
 haste_broadcast = { path = "crates/haste_broadcast", default-features = false }
 haste_core = { path = "crates/haste_core" }
+haste_protos = { path = "crates/haste_protos" }
 haste_vartype = { path = "crates/haste_vartype" }
-# my other repos
-valveprotos = { git = "https://github.com/blukai/valveprotos-rs.git", rev = "63620c46236ed0f03a9e8b75954a4dafd0fe8e53" }
 # external
 anyhow = "1.0.86"
 argh = "0.1.12"
@@ -26,6 +25,9 @@ http = "1.1.0"
 log = "0.4.22"
 pollster = "0.3.0"
 prost = "0.13.3"
+prost-build = "0.13.3"
+prost-types = "0.13.3"
+protox = "0.8.0"
 rand = "0.8.5"
 reqwest = { version = "0.12.8", default-features = false }
 serde = "1.0.210"
@@ -64,27 +66,18 @@ rand.workspace = true
 
 [features]
 broadcast = ["haste_broadcast/reqwest", "haste_broadcast/tokio"]
-deadlock = ["haste_core/deadlock"]
-dota2 = ["haste_core/dota2"]
 # TODO(blukai): rename preserve-metadata feature into something more meaningful,
 # or get rid of it all together and preserve symbols only in debug builds.
 preserve-metadata = ["haste_core/preserve-metadata"]
-protobuf-src = ["haste_core/protobuf-src"]
 
 [[example]]
 name = "deadlock-gametime"
 
 [[example]]
 name = "deadlock-position"
-required-features = ["deadlock"]
-
-[[example]]
-name = "dota2-allchat"
-required-features = ["dota2"]
 
 [[example]]
 name = "messagehandler-experiment"
-required-features = ["deadlock"]
 
 [[example]]
 name = "lifestate"

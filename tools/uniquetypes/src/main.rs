@@ -5,8 +5,8 @@ use std::io::BufReader;
 use anyhow::{Context as _, Result};
 use haste::demofile::DemoFile;
 use haste::demostream::DemoStream;
-use haste::valveprotos::common::{CDemoSendTables, CsvcMsgFlattenedSerializer, EDemoCommands};
-use haste::valveprotos::prost::Message;
+use haste::protos::{CDemoSendTables, CsvcMsgFlattenedSerializer, EDemoCommands};
+use haste::protos::prost::Message;
 use haste_vartype::{TokenKind, Tokenizer};
 use mars::varint;
 
