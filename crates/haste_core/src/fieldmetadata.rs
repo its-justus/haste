@@ -16,6 +16,16 @@ pub enum FieldMetadataError {
     /// number where a type is expected (`CUtlVector< 5 >`).
     #[error("unsupported type expression: {0}")]
     UnsupportedExpr(String),
+    /// a flattened serializer field lacks a symbol it must have (`var_type_sym`, `var_name_sym`).
+    #[error("flattened serializer field has no {symbol}")]
+    MissingSymbol { symbol: &'static str },
+    /// a symbol index of a flattened serializer field is not in the message's symbol table.
+    #[error("flattened serializer field: {symbol} is {index}, but there are {len} symbols")]
+    SymbolIndexOutOfRange {
+        symbol: &'static str,
+        index: i32,
+        len: usize,
+    },
 }
 
 // NOTE: Clone is derived because FlattenedSerializerField needs to be clonable.

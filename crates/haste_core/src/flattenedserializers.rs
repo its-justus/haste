@@ -148,6 +148,39 @@ pub struct FlattenedSerializerField {
     pub(crate) metadata: FieldMetadata,
 }
 
+/// the symbol at `index`, which must be in the message's symbol table.
+fn symbol_at<'a>(
+    msg: &'a CsvcMsgFlattenedSerializer,
+    symbol: &'static str,
+    index: i32,
+) -> Result<&'a String, FieldMetadataError> {
+    usize::try_from(index)
+        .ok()
+        .and_then(|i| msg.symbols.get(i))
+        .ok_or(FieldMetadataError::SymbolIndexOutOfRange {
+            symbol,
+            index,
+            len: msg.symbols.len(),
+        })
+}
+
+fn required_symbol<'a>(
+    msg: &'a CsvcMsgFlattenedSerializer,
+    symbol: &'static str,
+    index: Option<i32>,
+) -> Result<&'a String, FieldMetadataError> {
+    let index = index.ok_or(FieldMetadataError::MissingSymbol { symbol })?;
+    symbol_at(msg, symbol, index)
+}
+
+fn optional_symbol<'a>(
+    msg: &'a CsvcMsgFlattenedSerializer,
+    symbol: &'static str,
+    index: Option<i32>,
+) -> Result<Option<&'a String>, FieldMetadataError> {
+    index.map(|i| symbol_at(msg, symbol, i)).transpose()
+}
+
 // TODO: try to split flattened serializer field initialization into 3 clearly separate stages
 // (protobuf mapping; metadata; field serializer construction).
 impl FlattenedSerializerField {
@@ -155,27 +188,12 @@ impl FlattenedSerializerField {
         msg: &CsvcMsgFlattenedSerializer,
         field: &ProtoFlattenedSerializerFieldT,
     ) -> Result<Self, FieldMetadataError> {
-        // SAFETY: some symbols are cricual, if they don't exist - fail early
-        // and loudly.
-        //
-        // TODO: do not call get_unchecked here! that's stupid.
-        let resolve_sym_unchecked = |i: i32| unsafe { msg.symbols.get_unchecked(i as usize) };
-        let resolve_sym = |v: i32| &msg.symbols[v as usize];
-
-        let var_type = unsafe {
-            field
-                .var_type_sym
-                .map(resolve_sym_unchecked)
-                .unwrap_unchecked()
-        };
+        // the type and the name are required; the other symbols are optional, but any symbol
+        // that is present must point into `msg.symbols`.
+        let var_type = required_symbol(msg, "var_type_sym", field.var_type_sym)?;
         let var_type_symbol = Symbol::from(var_type);
 
-        let var_name = unsafe {
-            field
-                .var_name_sym
-                .map(resolve_sym_unchecked)
-                .unwrap_unchecked()
-        };
+        let var_name = required_symbol(msg, "var_name_sym", field.var_name_sym)?;
         let var_name_symbol = Symbol::from(var_name);
 
         // NOTE(blukai): send node is like a path for a field.
@@ -199,7 +217,7 @@ impl FlattenedSerializerField {
         //
         //   each component needs to be hashed separately, to be consistent with what
         //   `fkey_from_path` does.
-        let send_node = match field.send_node_sym.map(resolve_sym) {
+        let send_node = match optional_symbol(msg, "send_node_sym", field.send_node_sym)? {
             Some(send_node) if !send_node.is_empty() => {
                 let mut ret: [Option<Symbol>; MAX_SEND_NODE_PARTS] = array::from_fn(|_| None);
                 for (i, part) in send_node.split('.').enumerate() {
@@ -217,12 +235,15 @@ impl FlattenedSerializerField {
             low_value: field.low_value,
             high_value: field.high_value,
             encode_flags: field.encode_flags,
-            field_serializer_name: field
-                .field_serializer_name_sym
-                .map(resolve_sym)
-                .map(Symbol::from),
+            field_serializer_name: optional_symbol(
+                msg,
+                "field_serializer_name_sym",
+                field.field_serializer_name_sym,
+            )?
+            .map(Symbol::from),
             send_node,
-            var_encoder: field.var_encoder_sym.map(resolve_sym).map(Symbol::from),
+            var_encoder: optional_symbol(msg, "var_encoder_sym", field.var_encoder_sym)?
+                .map(Symbol::from),
 
             field_serializer: None,
             metadata: Default::default(),
@@ -526,5 +547,51 @@ mod tests {
              Num(5) where a type is expected\n  \
              CFoo.m_shared: type `A<>`: unexpected token at 2"
         );
+    }
+
+    fn new_field(
+        symbols: &[&str],
+        mutate: impl FnOnce(&mut ProtoFlattenedSerializerFieldT),
+    ) -> Result<FlattenedSerializerField, FieldMetadataError> {
+        let mut field = ProtoFlattenedSerializerFieldT {
+            var_type_sym: Some(0),
+            var_name_sym: Some(1),
+            ..Default::default()
+        };
+        mutate(&mut field);
+        let msg = CsvcMsgFlattenedSerializer {
+            symbols: symbols.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
+        };
+        FlattenedSerializerField::new(&msg, &field)
+    }
+
+    #[test]
+    fn field_with_valid_symbols_is_built() {
+        let field = new_field(&["int32", "m_a"], |_| {}).unwrap();
+        assert_eq!(field.var_type.hash, Symbol::from("int32").hash);
+        assert_eq!(field.var_name.hash, Symbol::from("m_a").hash);
+    }
+
+    #[test]
+    fn field_without_type_or_name_symbol_is_an_error() {
+        let err = new_field(&["int32", "m_a"], |f| f.var_type_sym = None).unwrap_err();
+        assert_eq!(err.to_string(), "flattened serializer field has no var_type_sym");
+        let err = new_field(&["int32", "m_a"], |f| f.var_name_sym = None).unwrap_err();
+        assert_eq!(err.to_string(), "flattened serializer field has no var_name_sym");
+    }
+
+    #[test]
+    fn field_with_out_of_range_symbol_is_an_error() {
+        let err = new_field(&["int32", "m_a"], |f| f.var_name_sym = Some(2)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "flattened serializer field: var_name_sym is 2, but there are 2 symbols"
+        );
+        let err = new_field(&["int32", "m_a"], |f| f.var_type_sym = Some(-1)).unwrap_err();
+        assert!(err.to_string().contains("var_type_sym is -1"), "{err}");
+        // optional symbols are checked too.
+        let err = new_field(&["int32", "m_a"], |f| f.send_node_sym = Some(9)).unwrap_err();
+        assert!(err.to_string().contains("send_node_sym is 9"), "{err}");
     }
 }
