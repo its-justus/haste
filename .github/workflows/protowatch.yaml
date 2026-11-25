@@ -1,0 +1,79 @@
+# Watches SteamDatabase/Protobufs (the deadlock/ folder) for changes to the messages haste
+# and the inquest reader decode. Opens an issue per upstream commit that changes them. It
+# never moves the pin and never opens branches: moving the pin is a decision.
+name: protowatch
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # full history of deadlock/ only: file contents are fetched when needed.
+      - uses: actions/checkout@v4
+        with:
+          repository: SteamDatabase/Protobufs
+          path: protobufs
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: deadlock
+
+      - name: Find the latest commit that touched deadlock/
+        id: latest
+        run: |
+          sha=$(git -C protobufs log -1 --format=%H -- deadlock)
+          pin=$(tr -d '[:space:]' < crates/haste_protos/PIN)
+          echo "latest=$sha pin=$pin"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if [ "$sha" = "$pin" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"
+          else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+
+      # protowatch reads the checkout's HEAD as its sha.
+      - name: Check out that commit
+        if: steps.latest.outputs.changed == 'true'
+        run: git -C protobufs checkout --quiet ${{ steps.latest.outputs.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.latest.outputs.changed == 'true'
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.latest.outputs.changed == 'true'
+
+      - name: Diff the watched messages
+        id: diff
+        if: steps.latest.outputs.changed == 'true'
+        run: |
+          set +e
+          cargo run --release -p protowatch -- diff protobufs > diff.md
+          code=$?
+          cat diff.md
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          # 0: no difference, 1: differences, anything else: protowatch itself failed.
+          [ "$code" -le 1 ]
+
+      - name: Open an issue
+        if: steps.diff.outputs.code == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.latest.outputs.sha }}
+        run: |
+          short=${SHA:0:7}
+          open=$(gh issue list --state open --limit 200 --json title \
+            --jq "[.[] | select(.title | contains(\"$short\"))] | length")
+          if [ "$open" != "0" ]; then
+            echo "an issue for $short is already open"
+            exit 0
+          fi
+          gh issue create --title "Protobufs changed: $short" --body-file diff.md

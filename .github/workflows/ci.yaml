@@ -16,17 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # valveprotos compiles .proto files at build time: it needs protoc and the
-      # well-known .proto files (libprotobuf-dev).
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libprotobuf-dev
-
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build --workspace --all-targets --features haste/deadlock
+        run: cargo build --workspace --all-targets
 
       - name: Test
-        run: cargo test --workspace --features haste/deadlock
+        run: cargo test --workspace
