@@ -1,8 +1,9 @@
 # Field type strings from Deadlock replays, one per line, sorted, each once.
 # Lines starting with # are comments. Every line must parse (tests/known_types.rs).
+# The types report (tools/types) marks type strings not in this list as new.
 #
-# Sources: matches 130675475 and 141881208, both recorded after the November 2026 patch.
-# Listed with memex's encounters/replay-reader `types` tool.
+# Sources: matches 130675475 and 141881208, both recorded after the November 2026 patch
+# (build 10932). Listed with tools/types, which reads every serializer version.
 AbilityUpgradeBits_t
 AnimLoopMode_t
 AnimationAlgorithm_t
@@ -47,6 +48,7 @@ CHandle< CTonemapController2 >
 CLightComponent
 CModifierProperty*
 CMsgLaneColor
+CNetworkUtlVectorBase< CGlobalSymbol >
 CNetworkUtlVectorBase< CHandle< CBaseAnimGraph > >
 CNetworkUtlVectorBase< CHandle< CBaseEntity > >
 CNetworkUtlVectorBase< CHandle< CBaseModelEntity > >

@@ -1,12 +1,12 @@
 //! Every type string seen in real replays must parse. All failures are reported at once.
 
-const DEADLOCK_TYPES: &str = include_str!("../testdata/deadlock_types.txt");
-
 #[test]
 fn deadlock_types_parse() {
-    let failures: Vec<String> = DEADLOCK_TYPES
-        .lines()
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+    let mut types: Vec<&str> = haste_vartype::known_deadlock_types().into_iter().collect();
+    types.sort();
+    assert!(types.len() > 200, "the list looks truncated: {}", types.len());
+    let failures: Vec<String> = types
+        .into_iter()
         .filter_map(|line| {
             haste_vartype::parse(line)
                 .err()

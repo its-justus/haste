@@ -151,7 +151,7 @@ pub struct FlattenedSerializerField {
 // TODO: try to split flattened serializer field initialization into 3 clearly separate stages
 // (protobuf mapping; metadata; field serializer construction).
 impl FlattenedSerializerField {
-    fn new(
+    pub(crate) fn new(
         msg: &CsvcMsgFlattenedSerializer,
         field: &ProtoFlattenedSerializerFieldT,
     ) -> Result<Self, FieldMetadataError> {

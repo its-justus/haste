@@ -17,6 +17,7 @@ pub(crate) mod instancebaseline;
 pub mod parser;
 pub(crate) mod quantizedfloat;
 pub mod stringtables;
+pub mod typereport;
 
 // own crate re-exports
 pub(crate) use haste_vartype as vartype;
