@@ -1,0 +1,238 @@
+# Field type strings from Deadlock replays, one per line, sorted, each once.
+# Lines starting with # are comments. Every line must parse (tests/known_types.rs).
+#
+# Sources: matches 130675475 and 141881208, both recorded after the November 2026 patch.
+# Listed with memex's encounters/replay-reader `types` tool.
+AbilityUpgradeBits_t
+AnimLoopMode_t
+AnimationAlgorithm_t
+AttachmentHandle_t
+AttachmentHandle_t[10]
+BeamType_t
+CAI_MotorServices*
+CBodyComponent
+CChoreoComponent*
+CCitadelGamerules*
+CCitadelPlayOfTheGame*
+CCitadel_Ability_Baba_BubblingBrew::EState
+CCitadel_Ability_Baba_HexingBrew::EBrewEffect
+CDestructiblePartsSystemComponent*
+CEntityIdentity*
+CEntityIndex
+CGameSceneNodeHandle
+CGlobalSymbol
+CHandle< CBaseEntity >
+CHandle< CBaseEntity >[10]
+CHandle< CBaseEntity >[64]
+CHandle< CBaseModelEntity >
+CHandle< CBasePlayerController >
+CHandle< CBasePlayerPawn >
+CHandle< CBasePropDoor >
+CHandle< CCitadelBaseAbility >
+CHandle< CCitadelHideoutPropBase >
+CHandle< CCitadelPassthroughFakeWall >
+CHandle< CCitadelPlayerPawn >
+CHandle< CCitadelPortalTrigger >
+CHandle< CCitadelProjectile >
+CHandle< CCitadelTrooperMinimap >
+CHandle< CCitadelTunnelNode >
+CHandle< CCitadelViscousBall >
+CHandle< CCitadel_Artist_StrokeBlocker >
+CHandle< CCitadel_DoorwayPortal >
+CHandle< CCitadel_MagicianTurret >
+CHandle< CColorCorrection >
+CHandle< CFogController >
+CHandle< CInfoFan >
+CHandle< CTonemapController2 >
+CLightComponent
+CModifierProperty*
+CMsgLaneColor
+CNetworkUtlVectorBase< CHandle< CBaseAnimGraph > >
+CNetworkUtlVectorBase< CHandle< CBaseEntity > >
+CNetworkUtlVectorBase< CHandle< CBaseModelEntity > >
+CNetworkUtlVectorBase< CHandle< CBasePlayerController > >
+CNetworkUtlVectorBase< CHandle< CBasePlayerPawn > >
+CNetworkUtlVectorBase< CHandle< CCitadelBaseAbility > >
+CNetworkUtlVectorBase< CHandle< CCitadelZipLineNode > >
+CNetworkUtlVectorBase< CHandle< CEconWearable > >
+CNetworkUtlVectorBase< CHandle< CNPC_ShieldedSentry > >
+CNetworkUtlVectorBase< CHandle< CPathNode > >
+CNetworkUtlVectorBase< CHandle< CPostProcessingVolume > >
+CNetworkUtlVectorBase< CNetworkUtlVectorBase< EEvent, NetworkVar_m_vecActiveEvents , -1, int > >
+CNetworkUtlVectorBase< CPlayerSlot >
+CNetworkUtlVectorBase< CTransform >
+CNetworkUtlVectorBase< CUtlString >
+CNetworkUtlVectorBase< CUtlStringToken >
+CNetworkUtlVectorBase< CUtlSymbolLarge >
+CNetworkUtlVectorBase< FullSellPriceAbilityUpgrades_t >
+CNetworkUtlVectorBase< GameTime_t >
+CNetworkUtlVectorBase< HeroID_t >
+CNetworkUtlVectorBase< QAngle >
+CNetworkUtlVectorBase< ResourceId_t >
+CNetworkUtlVectorBase< SoundeventBoxHelperNetworked_t >
+CNetworkUtlVectorBase< SoundeventPathCornerPairNetworked_t >
+CNetworkUtlVectorBase< Vector >
+CNetworkUtlVectorBase< Vector2D >
+CNetworkUtlVectorBase< Vector4D >
+CNetworkUtlVectorBase< VectorWS >
+CNetworkUtlVectorBase< bool >
+CNetworkUtlVectorBase< float32 >
+CNetworkUtlVectorBase< int32 >
+CNetworkUtlVectorBase< uint16 >
+CNetworkUtlVectorBase< uint8 >
+CNetworkedQuantizedFloat
+CPlayerSlot
+CPlayer_CameraServices*
+CPlayer_MovementServices*
+CPlayer_ObserverServices*
+CStrongHandle< InfoForResourceTypeCModel >
+CStrongHandle< InfoForResourceTypeCNmGraphDefinition >
+CStrongHandle< InfoForResourceTypeCPostProcessingResource >
+CStrongHandle< InfoForResourceTypeCTextureBase >
+CStrongHandle< InfoForResourceTypeIMaterial2 >
+CStrongHandle< InfoForResourceTypeIParticleSystemDefinition >
+CTransform
+CUtlBinaryBlock
+CUtlString
+CUtlStringToken
+CUtlSymbolLarge
+CUtlVector< CEconItemAttribute >
+CUtlVectorEmbeddedNetworkVar< AbilityUpgradeState_t >
+CUtlVectorEmbeddedNetworkVar< AnimGraph2SerializedPoseRecipeSlot_t >
+CUtlVectorEmbeddedNetworkVar< ConsumedComponentState_t >
+CUtlVectorEmbeddedNetworkVar< DynamicAbilityValues_t >
+CUtlVectorEmbeddedNetworkVar< EntityRenderAttribute_t >
+CUtlVectorEmbeddedNetworkVar< ItemDraftOption_t >
+CUtlVectorEmbeddedNetworkVar< ItemImbuementPair_t >
+CUtlVectorEmbeddedNetworkVar< LockonTarget_t >
+CUtlVectorEmbeddedNetworkVar< PlayOfTheGameTrigger_t >
+CUtlVectorEmbeddedNetworkVar< STeamFOWEntity >
+CUtlVectorEmbeddedNetworkVar< STrooperFOWEntity >
+CUtlVectorEmbeddedNetworkVar< StatViewerModifierValues_t >
+CUtlVectorEmbeddedNetworkVar< StolenAbilityPair_t >
+CUtlVectorEmbeddedNetworkVar< TeamKothState_t >
+CUtlVectorEmbeddedNetworkVar< TrackedStatNetworkData_t >
+CUtlVectorEmbeddedNetworkVar< ViewAngleServerChange_t >
+CUtlVectorEmbeddedNetworkVar< WeakPoint_t >
+CitadelAbilityUpgradeInfoPacked_t
+CitadelLobbyPlayerSlot_t
+Class_T
+Color
+DoorState_t
+EAbilitySlots_t
+EAttachState_t
+EBabaBenchMeleeAttackType
+EBabaBenchMeleeState
+ECatStatueState_t
+ECitadelGameMode
+ECitadelMatchMode
+ECitadelRankedType
+EClimbRopeState_t
+EFencerUltState_t
+EFireMode_t
+EFlexSlotTypes_t
+EFlightState
+EGameState
+EGuidedBotMatchObjective
+EHideoutButtonAction
+EHideoutButtonInteractStyle
+EHideoutPropSlotType_t
+ELashGrappleState
+ELeapState_t
+ELockonState
+EMeleeHold_AttackState
+EMeleeHold_AttackType
+EMidStairsLocation_t
+EMiniMapMarkerType_t
+EMinimapHeight
+EModifierValue
+ENextAttackDelayReason_t
+EPlantLeapPhase_t
+EPlayOfTheGameReplayTrigger
+EPlayerPlayState
+ERocketeerState
+EStreetBrawlGameState
+ESwingState_t
+ETelepunchState_t
+ETier3Phase_t
+ETier3State_t
+EUltimateState_t
+EViscousBowlingBallState_t
+EntityDissolveType_t
+EntityPlatformTypes_t
+FixAngleSet_t
+GameTick_t
+GameTime_t
+GameTime_t[20]
+GameTime_t[2]
+GameTime_t[4]
+HSequence
+HeroBadgeXP_t
+HeroBuildID_t
+HeroID_t
+HitGroup_t
+ItemDraftRoundID_t
+MatchID_t
+MoveCollide_t
+MoveType_t
+NPC_STATE
+PG_RisingRamState
+PackedRank_t
+PlayerConnectedState
+PointWorldTextJustifyHorizontal_t
+PointWorldTextJustifyVertical_t
+PointWorldTextReorientMode_t
+QAngle
+Quaternion
+RankInterval_t
+RenderFx_t
+RenderMode_t
+ResourceId_t
+ShardSolid_t
+SolidType_t
+StanceType_t
+SurroundingBoundsType_t
+TakeDamageFlags_t
+TrackedStatID_t
+TrackedStatValue_t
+ValueRemapperHapticsType_t
+ValueRemapperInputType_t
+ValueRemapperMomentumType_t
+ValueRemapperOutputType_t
+ValueRemapperRatchetType_t
+Vector
+Vector2D
+Vector4D
+VectorWS
+VectorWS[20]
+VectorWS[8]
+Vector[20]
+Vector[2]
+Vector[4]
+WorldGroupId_t
+attrib_definition_index_t
+attributeprovidertypes_t
+bool
+bool[4]
+char
+char[128]
+char[129]
+char[512]
+char[64]
+float32
+float32[4]
+int16
+int32
+int32[2]
+int32[6]
+int8
+item_definition_index_t
+itemid_t
+style_index_t
+uint16
+uint32
+uint32[12]
+uint32[1]
+uint64
+uint8
+uint8[4]
