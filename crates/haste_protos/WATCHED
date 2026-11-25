@@ -1,0 +1,46 @@
+# Messages and enums whose changes matter. `protowatch diff` compares these and every
+# message and enum reachable from them through fields. One full name per line (nested
+# types as Outer.Inner); `#` starts a comment.
+
+# What haste's core decodes: demo commands, packets, string tables, serializers, entities.
+EDemoCommands
+CDemoFileHeader
+CDemoFileInfo
+CDemoPacket
+CDemoFullPacket
+CDemoSendTables
+CDemoClassInfo
+CDemoStringTables
+CDemoSyncTick
+CDemoStop
+NET_Messages
+SVC_Messages
+CNETMsg_Tick
+CSVCMsg_ServerInfo
+CSVCMsg_ClassInfo
+CSVCMsg_CreateStringTable
+CSVCMsg_UpdateStringTable
+CSVCMsg_ClearAllStringTables
+CSVCMsg_PacketEntities
+CSVCMsg_FlattenedSerializer
+ProtoFlattenedSerializer_t
+ProtoFlattenedSerializerField_t
+
+# What the inquest reader decodes.
+CitadelUserMessageIds
+ECitadelGameEvents
+EBaseUserMessages
+EBaseGameEvents
+CCitadelUserMessage_Damage
+CCitadelUserMessage_BulletHit
+CCitadelUserMsg_CurrencyChanged
+CCitadelUserMessage_ImportantAbilityUsed
+CCitadelUserMsg_SoulBagPickup
+CCitadelUserMsg_HeroKilled
+CMsgFireBullets
+CModifierTableEntry
+MODIFIER_ENTRY_TYPE
+
+# The match details: the user message at the end of a match and the blob it points to.
+CCitadelUserMsg_PostMatchDetails
+CMsgMatchMetaDataContents
