@@ -283,6 +283,25 @@ impl FlattenedSerializerField {
     }
 }
 
+/// the serializer holding the one item field of a dynamic array of plain values. an item
+/// that is itself a dynamic array (a vector of vectors) gets its own item serializer, so a
+/// field path can go one level deeper for every level of nesting.
+fn dynamic_array_items(item: &FieldMetadata) -> Rc<FlattenedSerializer> {
+    let field_serializer = match item.special_descriptor {
+        Some(FieldSpecialDescriptor::DynamicArray { ref item }) => Some(dynamic_array_items(item)),
+        _ => None,
+    };
+    let field = FlattenedSerializerField {
+        metadata: item.clone(),
+        field_serializer,
+        ..Default::default()
+    };
+    Rc::new(FlattenedSerializer {
+        fields: vec![Rc::new(field)],
+        ..Default::default()
+    })
+}
+
 /// note about missing `serializer_version` field (from
 /// [`haste_protos::ProtoFlattenedSerializerT`]): entities resolve their serializers by
 /// looking up their class info within the [crate::entityclasses::EntityClasses] struct (which i
@@ -418,18 +437,8 @@ impl FlattenedSerializerContainer {
                             ..Default::default()
                         }))
                     }
-                    Some(FieldSpecialDescriptor::DynamicArray { ref decoder }) => {
-                        let field = FlattenedSerializerField {
-                            metadata: FieldMetadata {
-                                decoder: decoder.clone(),
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        };
-                        Some(Rc::new(FlattenedSerializer {
-                            fields: vec![Rc::new(field)],
-                            ..Default::default()
-                        }))
+                    Some(FieldSpecialDescriptor::DynamicArray { ref item }) => {
+                        Some(dynamic_array_items(item))
                     }
                     Some(FieldSpecialDescriptor::DynamicSerializerArray) => {
                         let field = FlattenedSerializerField {
@@ -593,5 +602,70 @@ mod tests {
         // optional symbols are checked too.
         let err = new_field(&["int32", "m_a"], |f| f.send_node_sym = Some(9)).unwrap_err();
         assert!(err.to_string().contains("send_node_sym is 9"), "{err}");
+    }
+
+    // a send table with one serializer of the given fields (name, type).
+    fn one_serializer(fields: &[(&str, &str)]) -> CDemoSendTables {
+        let mut symbols = vec!["CFoo".to_string()];
+        let mut proto_fields = Vec::new();
+        for (name, ty) in fields {
+            symbols.push(name.to_string());
+            symbols.push(ty.to_string());
+            proto_fields.push(ProtoFlattenedSerializerFieldT {
+                var_name_sym: Some(symbols.len() as i32 - 2),
+                var_type_sym: Some(symbols.len() as i32 - 1),
+                ..Default::default()
+            });
+        }
+        let msg = CsvcMsgFlattenedSerializer {
+            symbols,
+            serializers: vec![ProtoFlattenedSerializerT {
+                serializer_name_sym: Some(0),
+                serializer_version: Some(0),
+                fields_index: (0..proto_fields.len() as i32).collect(),
+            }],
+            fields: proto_fields,
+            ..Default::default()
+        };
+        CDemoSendTables {
+            data: Some(msg.encode_length_delimited_to_vec()),
+        }
+    }
+
+    // the "comma type" (06 §6.4): CCitadelEventState.m_vecActiveEvents, a vector of vectors.
+    // the field path of an event goes three deep (vector, inner vector, item); each level
+    // must have a child, or the entity decoder's unchecked lookup reads past the tree.
+    #[test]
+    fn vector_of_vectors_has_a_child_at_every_level() {
+        let ty = "CNetworkUtlVectorBase< CNetworkUtlVectorBase< EEvent, \
+                  NetworkVar_m_vecActiveEvents , -1, int > >";
+        let container = FlattenedSerializerContainer::parse(one_serializer(&[(
+            "m_vecActiveEvents",
+            ty,
+        )]))
+        .unwrap();
+        let serializer = container.by_name_hash(Symbol::from("CFoo").hash).unwrap();
+        let outer = serializer.get_child(0).unwrap();
+        assert!(outer.is_dynamic_array());
+        let inner = outer.get_child(0).expect("outer vector has an item field");
+        assert!(inner.is_dynamic_array(), "the item of the outer vector is a vector");
+        let event = inner.get_child(0).expect("inner vector has an item field");
+        assert!(!event.is_dynamic_array());
+        assert!(event.get_child(0).is_none());
+    }
+
+    #[test]
+    fn vector_of_values_is_unchanged() {
+        let container = FlattenedSerializerContainer::parse(one_serializer(&[(
+            "m_PathNodes_Position",
+            "CNetworkUtlVectorBase< Vector >",
+        )]))
+        .unwrap();
+        let serializer = container.by_name_hash(Symbol::from("CFoo").hash).unwrap();
+        let outer = serializer.get_child(0).unwrap();
+        assert!(outer.is_dynamic_array());
+        let item = outer.get_child(0).unwrap();
+        assert!(!item.is_dynamic_array());
+        assert!(item.get_child(0).is_none());
     }
 }

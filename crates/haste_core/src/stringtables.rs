@@ -52,6 +52,8 @@ pub struct StringTable {
     using_varint_bitcounts: bool,
 
     items: NoHashMap<i32, StringTableItem>,
+    /// the entries the last update touched, in the order it touched them; see [`Self::changed`].
+    changed: Vec<i32>,
 
     history: Vec<StringHistoryEntry>,
     string_buf: Vec<u8>,
@@ -83,6 +85,7 @@ impl StringTable {
             flags,
             using_varint_bitcounts,
             items: NoHashMap::with_capacity_and_hasher(1024, BuildHasherDefault::default()),
+            changed: Vec::new(),
 
             history: unsafe { make_vec(HISTORY_SIZE) },
             string_buf: unsafe { make_vec(1024) },
@@ -101,6 +104,7 @@ impl StringTable {
         num_entries: i32,
     ) -> Result<(), snap::Error> {
         let mut entry_index: i32 = -1;
+        self.changed.clear();
 
         // TODO: feature flag or something for a static allocation of history,
         // string_buf and user_data_buf in single threaded environment (similar
@@ -219,6 +223,7 @@ impl StringTable {
                 None
             };
 
+            self.changed.push(entry_index);
             self.items
                 .entry(entry_index)
                 .and_modify(|entry| {
@@ -257,7 +262,9 @@ impl StringTable {
             "removing entries is not supported"
         );
 
+        self.changed.clear();
         for (i, incoming) in table.items.iter().enumerate() {
+            self.changed.push(i as i32);
             self.items
                 .entry(i as i32)
                 .and_modify(|existing| {
@@ -294,6 +301,15 @@ impl StringTable {
     #[inline]
     pub fn get_item(&self, entry_index: &i32) -> Option<&StringTableItem> {
         self.items.get(entry_index)
+    }
+
+    /// the entries the last update of this table touched (a create, an update, or a full
+    /// update when seeking), in the order it touched them. an entry can appear more than once
+    /// if the update wrote it twice, and an entry can be touched with the data it already
+    /// had: compare with what you saw before if only real changes matter.
+    #[inline]
+    pub fn changed(&self) -> &[i32] {
+        &self.changed
     }
 }
 
@@ -333,7 +349,7 @@ impl StringTableContainer {
         &mut self.tables[len]
     }
 
-    pub fn do_full_update(&mut self, cmd: CDemoStringTables) {
+    pub fn do_full_update(&mut self, cmd: &CDemoStringTables) {
         for incoming in &cmd.tables {
             if let Some(existing) = self.find_table_mut(incoming.table_name()) {
                 existing.do_full_update(incoming);

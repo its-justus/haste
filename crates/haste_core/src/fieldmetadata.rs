@@ -46,12 +46,12 @@ pub(crate) enum FieldSpecialDescriptor {
     /// m_PathNodes_Position.1: Vector = [-736.0029, 596.5974, 384.0]
     /// ```
     DynamicArray {
-        /// decoder for the items of the dynamic array.
-        ///
-        /// decoder must be capable of decoding the type specified in the array's generic argument.
-        /// for example, if the var type is `CNetworkUtlVectorBase< Vector >`, the decoder must be
-        /// able to decode `Vector` values.
-        decoder: FieldDecoder,
+        /// metadata of the items of the dynamic array: the decoder for the type in the array's
+        /// first generic argument (for `CNetworkUtlVectorBase< Vector >`, one that decodes
+        /// `Vector` values), and the item's own special descriptor when the item is itself an
+        /// array. A vector of vectors (`CNetworkUtlVectorBase< CNetworkUtlVectorBase< EEvent,
+        /// ... > >`) has items that are dynamic arrays, whose items are `EEvent` values.
+        item: Box<FieldMetadata>,
     },
 
     /// represents a dynamic array of fields that must be deserialized by the serializer specified
@@ -225,7 +225,7 @@ fn visit_template(
         })?;
         return visit_any(item, field).map(|field_metadata| FieldMetadata {
             special_descriptor: Some(FieldSpecialDescriptor::DynamicArray {
-                decoder: field_metadata.decoder,
+                item: Box::new(field_metadata),
             }),
             decoder: FieldDecoder::new_u64_varint(),
         });

@@ -85,3 +85,17 @@ required-features = ["preserve-metadata"]
 
 [[example]]
 name = "seek"
+
+[[example]]
+name = "fields-dump"
+
+[[example]]
+name = "int-survey"
+required-features = ["preserve-metadata"]
+
+[[example]]
+name = "field-watch"
+required-features = ["preserve-metadata"]
+
+[[example]]
+name = "string-table-changes"
