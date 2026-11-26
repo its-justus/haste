@@ -15,7 +15,7 @@ use crate::entityclasses::EntityClasses;
 use crate::fielddecoder::FieldDecoderContext;
 use crate::flattenedserializers::FlattenedSerializerContainer;
 use crate::instancebaseline::{INSTANCE_BASELINE_TABLE_NAME, InstanceBaseline};
-use crate::stringtables::StringTableContainer;
+use crate::stringtables::{StringTable, StringTableContainer};
 
 // as can be observed when dumping commands. also as specified in clarity
 // (src/main/java/skadistats/clarity/model/engine/AbstractDotaEngineType.java)
@@ -116,6 +116,20 @@ pub trait Visitor {
 
     #[allow(unused_variables)]
     fn on_packet(&mut self, ctx: &Context, packet_type: u32, data: &[u8]) -> Result<()> {
+        Ok(())
+    }
+
+    /// called after a string table is created or updated, with the entries that update
+    /// touched ([`StringTable::changed`]). the table already holds the new data. a visitor
+    /// that follows a table (`ActiveModifiers`, the status effects) reads these entries
+    /// instead of comparing the whole table after every update.
+    #[allow(unused_variables)]
+    fn on_string_table(
+        &mut self,
+        ctx: &Context,
+        table: &StringTable,
+        changed: &[i32],
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -460,6 +474,10 @@ impl<D: DemoStream, V: Visitor> Parser<D, V> {
             }
         }
 
+        if let Some(table) = self.ctx.string_tables.find_table(msg.name()) {
+            self.visitor.on_string_table(&self.ctx, table, table.changed())?;
+        }
+
         Ok(())
     }
 
@@ -488,6 +506,10 @@ impl<D: DemoStream, V: Visitor> Parser<D, V> {
                     .instance_baseline
                     .update(string_table, entity_classes.classes)?;
             }
+        }
+
+        if let Some(table) = self.ctx.string_tables.get_table(table_id) {
+            self.visitor.on_string_table(&self.ctx, table, table.changed())?;
         }
 
         Ok(())
@@ -563,7 +585,12 @@ impl<D: DemoStream, V: Visitor> Parser<D, V> {
     }
 
     fn handle_cmd_string_tables(&mut self, cmd: CDemoStringTables) -> Result<()> {
-        self.ctx.string_tables.do_full_update(cmd);
+        self.ctx.string_tables.do_full_update(&cmd);
+        for incoming in &cmd.tables {
+            if let Some(table) = self.ctx.string_tables.find_table(incoming.table_name()) {
+                self.visitor.on_string_table(&self.ctx, table, table.changed())?;
+            }
+        }
 
         // SAFETY: entity_classes value is expected to be already assigned
         let entity_classes = unsafe { self.ctx.entity_classes.as_ref().unwrap_unchecked() };
@@ -594,6 +621,17 @@ impl<D: DemoStream, V: Visitor> Parser<D, V> {
 
     // public api
     // ----
+
+    /// the visitor, e.g. to read what it collected after [`Self::run_to_end`].
+    #[inline]
+    pub fn visitor(&self) -> &V {
+        &self.visitor
+    }
+
+    #[inline]
+    pub fn visitor_mut(&mut self) -> &mut V {
+        &mut self.visitor
+    }
 
     #[inline]
     pub fn demo_stream(&self) -> &D {

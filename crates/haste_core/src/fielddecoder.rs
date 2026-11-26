@@ -45,6 +45,15 @@ pub enum FieldDecoderConstructionError {
     QuantizedFloatError(#[from] QuantizedFloatError),
 }
 
+/// signed fields (`int32`, no encoder) that the game writes as plain unsigned varints, not
+/// zigzag ones. read as zigzag, a clip of 11, 10, 9 comes out -6, 5, -5. the field list
+/// gives no sign of it (same type, encoder, bit count as fields that are zigzag), so the
+/// names are listed here, like the field encoder overrides of valve's demoinfo2.txt.
+/// found by `examples/int-survey.rs` on two deadlock replays of build 10932 (2026-11-26):
+/// every weapon class's `m_iClip` and `m_iBonusClip`, nothing else. the value stays an
+/// [`FieldValue::I64`].
+pub const UNSIGNED_VARINT_FIELDS: &[&str] = &["m_iClip", "m_iBonusClip"];
+
 type DecodeFn = fn(&FieldDecoder, &mut FieldDecoderContext, &mut BitReader) -> FieldValue;
 
 #[rustfmt::skip]
@@ -59,6 +68,7 @@ mod decoders {
     pub fn decode_placeholder(_fd: &Fd, _ctx: &mut Ctx, _br: &mut Br) -> FieldValue { unreachable!() }
 
     pub fn decode_i64_varint(_fd: &Fd, _ctx: &mut Ctx, br: &mut Br) -> FieldValue { I64(br.read_varint64()) }
+    pub fn decode_i64_uvarint(_fd: &Fd, _ctx: &mut Ctx, br: &mut Br) -> FieldValue { I64(br.read_uvarint64() as i64) }
     pub fn decode_i64_fixed8(_fd: &Fd, _ctx: &mut Ctx, br: &mut Br) -> FieldValue { I64(br.read_ubit64(8) as i8 as i64) }
 
     pub fn decode_u64_varint(_fd: &Fd, _ctx: &mut Ctx, br: &mut Br) -> FieldValue { U64(br.read_uvarint64()) }
@@ -216,6 +226,11 @@ impl FieldDecoder {
     pub(crate) fn new_i64(field: &FlattenedSerializerField) -> Self {
         Self::new(if field.var_encoder_heq(fxhash::hash_bytes(b"fixed8")) {
             decode_i64_fixed8
+        } else if UNSIGNED_VARINT_FIELDS
+            .iter()
+            .any(|name| field.var_name.hash == fxhash::hash_bytes(name.as_bytes()))
+        {
+            decode_i64_uvarint
         } else {
             decode_i64_varint
         })
@@ -366,5 +381,54 @@ impl FieldDecoder {
     #[inline(always)]
     pub(crate) fn decode(&self, ctx: &mut FieldDecoderContext, br: &mut BitReader) -> FieldValue {
         (self.decode_fn)(self, ctx, br)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use haste_protos::{CsvcMsgFlattenedSerializer, ProtoFlattenedSerializerFieldT};
+
+    use super::*;
+
+    fn int32_field(name: &str) -> FlattenedSerializerField {
+        let msg = CsvcMsgFlattenedSerializer {
+            symbols: vec!["int32".to_string(), name.to_string()],
+            ..Default::default()
+        };
+        let field = ProtoFlattenedSerializerFieldT {
+            var_type_sym: Some(0),
+            var_name_sym: Some(1),
+            ..Default::default()
+        };
+        FlattenedSerializerField::new(&msg, &field).unwrap()
+    }
+
+    fn decode(field: &FlattenedSerializerField, bytes: &[u8]) -> FieldValue {
+        let mut br = BitReader::new(bytes);
+        let value = field.metadata.decoder.decode(&mut FieldDecoderContext::default(), &mut br);
+        br.is_overflowed().unwrap();
+        value
+    }
+
+    // m_iClip of CCitadel_Ability_ShivWeapon in match 130675475 counts 11, 10, 9 ... 5; read
+    // as zigzag those bytes gave -6, 5, -5 ... -3 (F3, 2026-11-26).
+    #[test]
+    fn clip_fields_are_plain_varints() {
+        let clip = int32_field("m_iClip");
+        let bonus = int32_field("m_iBonusClip");
+        for raw in 0u8..=12 {
+            assert!(matches!(decode(&clip, &[raw]), FieldValue::I64(v) if v == raw as i64));
+            assert!(matches!(decode(&bonus, &[raw]), FieldValue::I64(v) if v == raw as i64));
+        }
+        // 170, the largest clip seen, takes two bytes
+        assert!(matches!(decode(&clip, &[0xaa, 0x01]), FieldValue::I64(170)));
+    }
+
+    #[test]
+    fn other_int32_fields_stay_zigzag() {
+        let health = int32_field("m_iHealth");
+        assert!(matches!(decode(&health, &[11]), FieldValue::I64(-6)));
+        assert!(matches!(decode(&health, &[10]), FieldValue::I64(5)));
+        assert!(matches!(decode(&health, &[0xe8, 0x07]), FieldValue::I64(500)));
     }
 }
